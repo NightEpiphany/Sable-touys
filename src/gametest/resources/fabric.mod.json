@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "touys_test",
+  "version": "1.0.0",
+  "name": "Touys GameTests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": [
+      { "adapter": "kotlin", "value": "com.moigferdsrte.touy.gametest.ProjectorGameTests" },
+      { "adapter": "kotlin", "value": "com.moigferdsrte.touy.gametest.RecordingGameTests" },
+      { "adapter": "kotlin", "value": "com.moigferdsrte.touy.gametest.PhysicsToolGameTests" }
+    ],
+    "main": [
+      { "adapter": "kotlin", "value": "com.moigferdsrte.touy.gametest.GameTestSupport" }
+    ]
+  },
+  "depends": { "touys": "*", "fabric-gametest-api-v1": "*" }
+}

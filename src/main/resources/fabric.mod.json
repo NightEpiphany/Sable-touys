@@ -1,0 +1,44 @@
+{
+	"schemaVersion": 1,
+	"id": "touys",
+	"version": "${version}",
+	"name": "Touys",
+	"description": "Kotlin port of Touys physics tools for Minecraft 26.3 Fabric, powered by Sable.",
+	"authors": [
+		"NightEpiphany",
+		"KyanBirb (original Touys)"
+	],
+	"contact": {
+		"homepage": "https://github.com/KyanBirb/touys",
+		"sources": "https://github.com/KyanBirb/touys",
+		"sable-port": "https://github.com/NightEpiphany/sable-port"
+	},
+	"license": "MIT",
+	"icon": "touys.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			{
+				"value": "com.moigferdsrte.touy.SableTouy",
+				"adapter": "kotlin"
+			}
+		],
+		"client": [
+			{
+				"value": "com.moigferdsrte.touy.SableTouyClient",
+				"adapter": "kotlin"
+			}
+		]
+	},
+	"mixins": [
+		"touy.mixins.json"
+	],
+	"depends": {
+		"sable": ">=3.0.0",
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*",
+		"fabric-language-kotlin": "*"
+	}
+}

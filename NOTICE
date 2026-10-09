@@ -1,0 +1,15 @@
+Touys: Minecraft 26.3 Fabric Kotlin port
+
+Original Touys source and its models, textures, sounds, and other resources:
+Copyright (c) 2025 KyanBirb
+https://github.com/KyanBirb/touys
+Licensed under the MIT License, reproduced in LICENSE.
+
+This port replaces the original Fabric/NeoForge and Veil integration with
+Minecraft 26.3 Fabric APIs. The namespace "touys" is retained for compatibility.
+
+Sable is a separately distributed dependency by ryanhcode:
+https://github.com/ryanhcode/sable
+The Minecraft 26.3 Sable port is maintained at:
+https://github.com/NightEpiphany/sable-port
+Sable is not covered by the Touys license; its own license applies.

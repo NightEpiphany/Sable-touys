@@ -1,0 +1,144 @@
+package com.moigferdsrte.touy.client
+
+import com.moigferdsrte.touy.core.TouyComponents
+import com.moigferdsrte.touy.core.TouyItems
+import com.moigferdsrte.touy.util.SubLevelTargeting
+import com.moigferdsrte.touy.util.SubLevelTemplate
+import dev.ryanhcode.sable.Sable
+import dev.ryanhcode.sable.api.sublevel.SubLevelContainer
+import dev.ryanhcode.sable.companion.math.Pose3dc
+import dev.ryanhcode.sable.sublevel.ClientSubLevel
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext
+import net.minecraft.client.Minecraft
+import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.client.player.LocalPlayer
+import net.minecraft.gizmos.Gizmo
+import net.minecraft.gizmos.GizmoPrimitives
+import net.minecraft.gizmos.GizmoStyle
+import net.minecraft.gizmos.Gizmos
+import net.minecraft.gizmos.SimpleGizmoCollector
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
+import kotlin.math.max
+import kotlin.math.min
+
+/** Extract immutable geometry on the client thread; drawing never reads a live sub-level. */
+object ToolOverlays {
+    private val collector = SimpleGizmoCollector()
+    private val transformScratch = Vector3d()
+    private val SELECTED = GizmoStyle.stroke(-1, 2.0f)
+    private val TRACKED = GizmoStyle.stroke(0xFF00FFFF.toInt(), 2.0f)
+    private val REMOVAL = GizmoStyle.strokeAndFill(0xFFFF3333.toInt(), 2.0f, 0x22FF3333)
+    private val ASSEMBLY = GizmoStyle.strokeAndFill(0xFF00FFFF.toInt(), 2.0f, 0x2200FFFF)
+
+    fun extract(context: LevelExtractionContext) {
+        val minecraft = Minecraft.getInstance()
+        val player = minecraft.player ?: return
+        val level = context.level()
+        val container = SubLevelContainer.getContainer(level) ?: return
+        val partialTick = context.deltaTracker().getGameTimeDeltaPartialTick(true)
+        Gizmos.withCollector(collector).use {
+            val screen = minecraft.gui.screen()
+            if (screen is CameraScreen) {
+                val ids = screen.selectedIds
+                var index = 0
+                while (index < ids.size) {
+                    val subLevel = container.getSubLevel(ids[index++]) as? ClientSubLevel ?: continue
+                    outline(subLevel, partialTick, SELECTED)
+                }
+            }
+            extractTool(level, player, player.mainHandItem, partialTick)
+            if (!player.offhandItem.isEmpty) extractTool(level, player, player.offhandItem, partialTick)
+        }
+        context.levelRenderer().addMainThreadGizmos(collector.drainGizmos())
+    }
+
+    private fun extractTool(level: ClientLevel, player: LocalPlayer, stack: ItemStack, partialTick: Float) {
+        when {
+            stack.`is`(TouyItems.BUBBLE_BLOWER) -> {
+                val start = stack.get(TouyComponents.ASSEMBLY_START) ?: return
+                if (stack.get(TouyComponents.ASSEMBLY_DIMENSION) != level.dimension().identifier().toString()) return
+                val hit = SubLevelTargeting.hit(level, player) ?: return
+                val end = hit.blockPos
+                val startGrid = Sable.HELPER.getContaining(level, start)
+                val endGrid = Sable.HELPER.getContaining(level, end)
+                if (startGrid !== endGrid || startGrid?.uniqueId != stack.get(TouyComponents.ASSEMBLY_SUB_LEVEL) ||
+                    startGrid?.isRemoved == true || (startGrid == null && Sable.HELPER.isInPlotGrid(level, start))) return
+                val bounds = AABB(min(start.x, end.x).toDouble(), min(start.y, end.y).toDouble(), min(start.z, end.z).toDouble(),
+                    max(start.x, end.x) + 1.0, max(start.y, end.y) + 1.0, max(start.z, end.z) + 1.0)
+                box(bounds, (startGrid as? ClientSubLevel)?.renderPose(partialTick), ASSEMBLY)
+            }
+            stack.`is`(TouyItems.CLONE_GUN) -> {
+                val copied = stack.get(TouyComponents.COPIED_PLOT)
+                if (copied != null && !player.isShiftKeyDown) {
+                    val hit = SubLevelTargeting.hit(level, player) ?: return
+                    val pose = SubLevelTemplate.placementPose(level, player, hit, copied)
+                    box(SubLevelTemplate.previewBounds(copied), pose, TRACKED)
+                } else (SubLevelTargeting.target(level, player) as? ClientSubLevel)?.let { outline(it, partialTick, TRACKED) }
+            }
+            stack.`is`(TouyItems.EVIL_ASS_ORB) -> {
+                val target = SubLevelTargeting.target(level, player) as? ClientSubLevel ?: return
+                outline(target, partialTick, REMOVAL)
+                if (player.isUsingItem && player.useItem === stack) {
+                    val bounds = target.boundingBox()
+                    Gizmos.line(Sable.HELPER.projectOutOfSubLevel(level, player.eyePosition), Vec3((bounds.minX() + bounds.maxX()) * 0.5,
+                        (bounds.minY() + bounds.maxY()) * 0.5, (bounds.minZ() + bounds.maxZ()) * 0.5), 0xFFFF3333.toInt(), 3.0f)
+                }
+            }
+            stack.`is`(TouyItems.TAPE) || stack.`is`(TouyItems.CAMCORDER) || stack.`is`(TouyItems.CROWBAR) -> {
+                val tracked = stack.get(TouyComponents.TRACKED_SUB_LEVEL)
+                val target = if (tracked == null) SubLevelTargeting.target(level, player)
+                    else SubLevelContainer.getContainer(level)?.getSubLevel(tracked)
+                (target as? ClientSubLevel)?.let { outline(it, partialTick, TRACKED) }
+            }
+        }
+    }
+
+    private fun outline(subLevel: ClientSubLevel, partialTick: Float, style: GizmoStyle) {
+        if (subLevel.isRemoved) return
+        val bounds = subLevel.plot.boundingBox
+        box(AABB(bounds.minX().toDouble(), bounds.minY().toDouble(), bounds.minZ().toDouble(),
+            bounds.maxX() + 1.0, bounds.maxY() + 1.0, bounds.maxZ() + 1.0), subLevel.renderPose(partialTick), style)
+    }
+
+    private fun box(bounds: AABB, pose: Pose3dc?, style: GizmoStyle) {
+        if (pose == null) {
+            Gizmos.cuboid(bounds, style).setAlwaysOnTop()
+            return
+        }
+        val corners = Array(8) { index ->
+            transformScratch.set(if (index and 1 == 0) bounds.minX else bounds.maxX,
+                if (index and 2 == 0) bounds.minY else bounds.maxY,
+                if (index and 4 == 0) bounds.minZ else bounds.maxZ)
+            pose.transformPosition(transformScratch)
+            Vec3(transformScratch.x, transformScratch.y, transformScratch.z)
+        }
+        Gizmos.addGizmo(OrientedBox(corners, style)).setAlwaysOnTop()
+    }
+
+    /** Each instance owns a snapshot so it remains safe when rendering uses a different thread. */
+    private class OrientedBox(private val corners: Array<Vec3>, private val style: GizmoStyle) : Gizmo {
+        override fun emit(primitives: GizmoPrimitives, alpha: Float) {
+            if (style.hasStroke()) {
+                var index = 0
+                while (index < 8) {
+                    if (index and 1 == 0) primitives.addLine(corners[index], corners[index or 1], style.multipliedStroke(alpha), style.strokeWidth())
+                    if (index and 2 == 0) primitives.addLine(corners[index], corners[index or 2], style.multipliedStroke(alpha), style.strokeWidth())
+                    if (index and 4 == 0) primitives.addLine(corners[index], corners[index or 4], style.multipliedStroke(alpha), style.strokeWidth())
+                    index++
+                }
+            }
+            if (style.hasFill()) {
+                val color = style.multipliedFill(alpha)
+                primitives.addQuad(corners[0], corners[2], corners[3], corners[1], color)
+                primitives.addQuad(corners[4], corners[5], corners[7], corners[6], color)
+                primitives.addQuad(corners[0], corners[1], corners[5], corners[4], color)
+                primitives.addQuad(corners[2], corners[6], corners[7], corners[3], color)
+                primitives.addQuad(corners[0], corners[4], corners[6], corners[2], color)
+                primitives.addQuad(corners[1], corners[3], corners[7], corners[5], color)
+            }
+        }
+    }
+}

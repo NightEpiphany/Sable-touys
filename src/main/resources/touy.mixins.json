@@ -1,0 +1,9 @@
+{
+	"required": true,
+	"package": "com.moigferdsrte.touy.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": ["CrashReportMixin"],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
