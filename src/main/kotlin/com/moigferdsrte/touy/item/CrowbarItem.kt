@@ -2,6 +2,7 @@ package com.moigferdsrte.touy.item
 
 import com.moigferdsrte.touy.SableTouy
 import com.moigferdsrte.touy.core.TouyComponents
+import com.moigferdsrte.touy.util.CrowbarPhysics
 import com.moigferdsrte.touy.util.SubLevelTargeting
 import com.moigferdsrte.touy.util.TouyConfig
 import dev.ryanhcode.sable.Sable
@@ -32,7 +33,11 @@ import org.joml.Vector3d
 
 /** The Sable punch attribute strengthens normal left-click punches at the actual hit point. */
 class CrowbarItem(properties: Properties, descriptionLines: Int) :
-    TouyItem(properties.attributes(defaultAttributes()), descriptionLines) {
+    TouyItem(
+        // 延迟到组件初始化阶段，确保 Sable 的属性已完成注册。
+        properties.delayedComponent(DataComponents.ATTRIBUTE_MODIFIERS) { defaultAttributes() },
+        descriptionLines
+    ) {
 
     override fun inventoryTick(stack: ItemStack, level: ServerLevel, entity: Entity, slot: EquipmentSlot?) {
         super.inventoryTick(stack, level, entity, slot)
@@ -82,10 +87,12 @@ class CrowbarItem(properties: Properties, descriptionLines: Int) :
             return InteractionResult.FAIL
         }
         val handle = RigidBodyHandle.of(target) ?: return InteractionResult.FAIL
-        val strength = (getPunchAttribute(stack)?.amount() ?: TouyConfig.crowbarStrength) + 1.0
+        val strength = getPunchAttribute(stack)?.amount() ?: TouyConfig.crowbarStrength
         val direction = target.logicalPose().transformNormalInverse(
             Vector3d(player.lookAngle.x, player.lookAngle.y, player.lookAngle.z))
-        handle.applyImpulseAtPoint(Vector3d(hit.location.x, hit.location.y, hit.location.z), direction.mul(strength))
+        val position = Vector3d(hit.location.x, hit.location.y, hit.location.z)
+        handle.applyImpulseAtPoint(position, CrowbarPhysics.limitImpulse(target, handle, position,
+            direction.mul(strength + 1.0), CrowbarPhysics.speedLimit(strength)))
         player.cooldowns.addCooldown(stack, 5)
         return InteractionResult.SUCCESS
     }

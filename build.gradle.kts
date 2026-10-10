@@ -4,7 +4,6 @@ plugins {
     id("net.fabricmc.fabric-loom")
     `maven-publish`
     id("org.jetbrains.kotlin.jvm") version "2.4.20"
-    kotlin("kapt") version "2.4.20"
 }
 
 repositories {
@@ -23,8 +22,8 @@ dependencies {
     // Fabric API. This is technically optional, but you probably want it anyway.
     implementation("net.fabricmc.fabric-api:fabric-api:${providers.gradleProperty("fabric_api_version").get()}")
     implementation("net.fabricmc:fabric-language-kotlin:${providers.gradleProperty("fabric_kotlin_version").get()}")
+    // 非混淆版本无需 Mixin 注解处理器，运行时由 Fabric Loader 提供 MixinExtras。
     compileOnly("io.github.llamalad7:mixinextras-common:0.5.0")
-    kapt("io.github.llamalad7:mixinextras-common:0.5.0")
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

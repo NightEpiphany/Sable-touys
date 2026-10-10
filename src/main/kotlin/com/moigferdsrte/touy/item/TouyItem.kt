@@ -10,6 +10,7 @@ import net.minecraft.world.item.component.TooltipDisplay
 import java.util.function.Consumer
 
 open class TouyItem(properties: Properties, descriptionLines: Int) : Item(properties.component(TouyComponents.ITEM_DESCRIPTION, descriptionLines)) {
+    @Deprecated("Deprecated in Java")
     override fun appendHoverText(stack: ItemStack, context: TooltipContext, display: TooltipDisplay, lines: Consumer<Component>, flag: TooltipFlag) {
         super.appendHoverText(stack, context, display, lines, flag)
         val count = stack.get(TouyComponents.ITEM_DESCRIPTION) ?: return
