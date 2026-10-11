@@ -6,8 +6,7 @@
   "environment": "*",
   "entrypoints": {
     "fabric-gametest": [
-      { "adapter": "kotlin", "value": "com.moigferdsrte.touy.gametest.ProjectorGameTests" },
-      { "adapter": "kotlin", "value": "com.moigferdsrte.touy.gametest.RecordingGameTests" }
+
     ],
     "main": [
       { "adapter": "kotlin", "value": "com.moigferdsrte.touy.gametest.GameTestSupport" }
