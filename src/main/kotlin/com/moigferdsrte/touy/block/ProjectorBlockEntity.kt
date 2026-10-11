@@ -26,6 +26,12 @@ class ProjectorBlockEntity(pos: BlockPos, state: BlockState) :
     override fun getMaxStackSize(): Int = 1
     override fun canPlaceItem(slot: Int, stack: ItemStack): Boolean = slot == 0 && stack.item is ProjectableItem
 
+    override fun splitTheItem(amount: Int): ItemStack {
+        val removed = storedItem.split(amount)
+        setTheItem(storedItem)
+        return removed
+    }
+
     override fun setTheItem(stack: ItemStack) {
         storedItem = stack
         val world = level
