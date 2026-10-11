@@ -13,6 +13,10 @@ repositories {
     mavenCentral()
 }
 
+base {
+    archivesName = providers.gradleProperty("archives_base_name")
+}
+
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft("com.mojang:minecraft:${providers.gradleProperty("minecraft_version").get()}")
