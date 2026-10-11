@@ -67,7 +67,6 @@
   "touys.message.assembly_failed": "Assembly failed; see the log for details",
   "touys.message.clone_failed": "Unable to clone this sub-level",
   "touys.message.clone_too_large": "This sub-level exceeds the clone size limit",
-  "touys.message.crowbar_strength": "Crowbar strength: %s",
   "command.touys.reload.success": "Touys configuration reloaded",
   "command.touys.reload.failed": "Invalid Touys configuration; kept the previous configuration. See the log for details."
 }

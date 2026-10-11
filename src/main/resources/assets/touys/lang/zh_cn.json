@@ -67,7 +67,6 @@
   "touys.message.assembly_failed": "装配失败，详情请查看日志",
   "touys.message.clone_failed": "无法克隆此子世界",
   "touys.message.clone_too_large": "此子世界超过克隆大小上限",
-  "touys.message.crowbar_strength": "撬棍力度：%s",
   "command.touys.reload.success": "Touys 配置已重载",
   "command.touys.reload.failed": "Touys 配置无效，已保留上次有效配置；详情请查看日志。"
 }

@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package com.moigferdsrte.touy.util
 
 import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle

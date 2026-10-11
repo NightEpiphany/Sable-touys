@@ -9,21 +9,25 @@ class ConfigValuesTest {
         val config = ConfigValues.parse("""
             { // bounded selection
               item_range: 0x50, assembly_max_blocks: 65536,
-              crowbar_strength: +400., 'recording_max_duration': -1,
+              'recording_max_duration': -1,
               /* remaining values use defaults */
             }
         """.trimIndent())
         assertEquals(80, config.itemRange)
-        assertEquals(400.0, config.crowbarStrength)
         assertEquals(-1, config.recordingMaxDuration)
         assertEquals(16, config.recordingMaxSessions)
     }
 
     @Test
+    fun `legacy crowbar configuration cannot change the fixed item strength`() {
+        assertEquals(ConfigValues(), ConfigValues.parse("{crowbar_strength: 400}"))
+    }
+
+    @Test
     fun `unsafe numbers invalid types and out of range limits are rejected`() {
-        listOf("{crowbar_strength: NaN}", "{crowbar_strength: Infinity}", "{item_range: 80.5}",
+        listOf("{item_range: NaN}", "{item_range: Infinity}", "{item_range: 80.5}",
             "{item_range: 257}", "{clone_max_blocks: 65537}", "{recording_max_sessions: 0}",
-            "{crowbar_strength: 4097}", "{recording_max_duration: 12001}",
+            "{recording_max_duration: 12001}",
             "{max_snapshot_sub_levels: 129}", "{item_range: '80'}", "[]").forEach { text ->
             assertThrows(IllegalArgumentException::class.java, { ConfigValues.parse(text) }, text)
         }

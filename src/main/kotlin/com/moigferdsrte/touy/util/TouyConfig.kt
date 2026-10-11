@@ -10,7 +10,6 @@ object TouyConfig {
     val itemRange: Int get() = values.itemRange
     val assemblyMaxBlocks: Int get() = values.assemblyMaxBlocks
     val cloneMaxBlocks: Int get() = values.cloneMaxBlocks
-    val crowbarStrength: Double get() = values.crowbarStrength
     val recordingMaxDuration: Int get() = values.recordingMaxDuration
     val recordingInactiveTicks: Int get() = values.recordingInactiveTicks
     val recordingMaxSessions: Int get() = values.recordingMaxSessions
@@ -57,7 +56,6 @@ object TouyConfig {
           item_range: 80,
           assembly_max_blocks: 65536,
           clone_max_blocks: 65536,
-          crowbar_strength: 400,
           // -1 uses the hard memory limit of 12000 ticks (10 minutes).
           recording_max_duration: 6000,
           // -1 disables the inactivity timeout.

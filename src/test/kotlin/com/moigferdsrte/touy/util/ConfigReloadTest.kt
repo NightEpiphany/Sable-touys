@@ -13,19 +13,19 @@ class ConfigReloadTest {
     @Test
     fun `hot reload applies whole valid snapshot and preserves it after an invalid edit`() {
         val file = directory.resolve("touys.json5")
-        Files.writeString(file, "{item_range: 60, crowbar_strength: 200}")
+        Files.writeString(file, "{item_range: 60, recording_max_sessions: 12}")
         TouyConfig.load(file)
         val valid = TouyConfig.snapshot()
         assertEquals(60, valid.itemRange)
-        assertEquals(200.0, valid.crowbarStrength)
-        Files.writeString(file, "{item_range: 120, crowbar_strength: Infinity}")
+        assertEquals(12, valid.recordingMaxSessions)
+        Files.writeString(file, "{item_range: 120, recording_max_sessions: Infinity}")
         assertFalse(TouyConfig.reloadIfChanged(force = true))
         assertSame(valid, TouyConfig.snapshot())
-        Files.writeString(file, "{item_range: 120, crowbar_strength: 300}")
+        Files.writeString(file, "{item_range: 120, recording_max_sessions: 20}")
         Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() + 2_000))
         assertTrue(TouyConfig.reloadIfChanged())
         assertEquals(120, TouyConfig.itemRange)
-        assertEquals(300.0, TouyConfig.crowbarStrength)
+        assertEquals(20, TouyConfig.recordingMaxSessions)
         TouyConfig.load(directory.resolve("defaults.json5"))
     }
 }

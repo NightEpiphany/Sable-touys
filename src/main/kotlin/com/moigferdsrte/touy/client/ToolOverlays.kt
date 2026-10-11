@@ -79,15 +79,33 @@ object ToolOverlays {
                 } else (SubLevelTargeting.target(level, player) as? ClientSubLevel)?.let { outline(it, partialTick, TRACKED) }
             }
             stack.`is`(TouyItems.EVIL_ASS_ORB) -> {
-                val target = SubLevelTargeting.target(level, player) as? ClientSubLevel ?: return
-                outline(target, partialTick, REMOVAL)
-                if (player.isUsingItem && player.useItem === stack) {
-                    val bounds = target.boundingBox()
-                    Gizmos.line(Sable.HELPER.projectOutOfSubLevel(level, player.eyePosition), Vec3((bounds.minX() + bounds.maxX()) * 0.5,
-                        (bounds.minY() + bounds.maxY()) * 0.5, (bounds.minZ() + bounds.maxZ()) * 0.5), 0xFFFF3333.toInt(), 3.0f)
+                val hit = SubLevelTargeting.hit(level, player, partialTick)
+                if (hit != null) {
+                    (Sable.HELPER.getContaining(level, hit.blockPos) as? ClientSubLevel)?.let {
+                        outline(it, partialTick, REMOVAL)
+                    }
                 }
+                val minecraft = Minecraft.getInstance()
+                if (!minecraft.options.cameraType.isFirstPerson) return
+                val beamAlpha = OrbAnimation.beamAlpha(minecraft)
+                if (beamAlpha <= 0f) return
+                val camera = minecraft.gameRenderer.mainCamera()
+                if (!camera.isInitialized) return
+                val forward = camera.forwardVector()
+                val right = Vec3(camera.leftVector()).scale(-1.0)
+                val up = camera.upVector()
+                val position = camera.position()
+                val muzzle = position.add(
+                    forward.x() * 0.65 + right.x() * 0.36 - up.x() * 0.16,
+                    forward.y() * 0.65 + right.y() * 0.36 - up.y() * 0.16,
+                    forward.z() * 0.65 + right.z() * 0.36 - up.z() * 0.16
+                )
+                val endpoint = if (hit == null) position.add(
+                    forward.x() * 80.0, forward.y() * 80.0, forward.z() * 80.0
+                ) else Sable.HELPER.projectOutOfSubLevel(level, hit.location)
+                Gizmos.addGizmo(OrbBeam(muzzle, endpoint, right, Vec3(up), beamAlpha)).setAlwaysOnTop()
             }
-            stack.`is`(TouyItems.TAPE) || stack.`is`(TouyItems.CAMCORDER) || stack.`is`(TouyItems.CROWBAR) -> {
+            stack.`is`(TouyItems.TAPE) || stack.`is`(TouyItems.CAMCORDER) -> {
                 val tracked = stack.get(TouyComponents.TRACKED_SUB_LEVEL)
                 val target = if (tracked == null) SubLevelTargeting.target(level, player)
                     else SubLevelContainer.getContainer(level)?.getSubLevel(tracked)
@@ -116,6 +134,43 @@ object ToolOverlays {
             Vec3(transformScratch.x, transformScratch.y, transformScratch.z)
         }
         Gizmos.addGizmo(OrientedBox(corners, style)).setAlwaysOnTop()
+    }
+
+    private class OrbBeam(
+        private val origin: Vec3,
+        private val endpoint: Vec3,
+        private val right: Vec3,
+        private val up: Vec3,
+        private val beamAlpha: Float
+    ) : Gizmo {
+        override fun emit(primitives: GizmoPrimitives, alpha: Float) {
+            val color = (0xCC * (alpha * beamAlpha)).toInt().coerceIn(0, 0xCC) shl 24 or 0x00FF1A0F
+            val baseHalfWidth = 0.10
+            val baseHalfHeight = 0.08
+            val tipHalfWidth = 0.018
+            val tipHalfHeight = 0.018
+            val baseRight = right.scale(baseHalfWidth)
+            val baseUp = up.scale(baseHalfHeight)
+            val tipRight = right.scale(tipHalfWidth)
+            val tipUp = up.scale(tipHalfHeight)
+            val baseTopRight = origin.add(baseRight).add(baseUp)
+            val baseTopLeft = origin.subtract(baseRight).add(baseUp)
+            val baseBottomLeft = origin.subtract(baseRight).subtract(baseUp)
+            val baseBottomRight = origin.add(baseRight).subtract(baseUp)
+            val tipTopRight = endpoint.add(tipRight).add(tipUp)
+            val tipTopLeft = endpoint.subtract(tipRight).add(tipUp)
+            val tipBottomLeft = endpoint.subtract(tipRight).subtract(tipUp)
+            val tipBottomRight = endpoint.add(tipRight).subtract(tipUp)
+            quad(primitives, baseTopRight, baseTopLeft, tipTopLeft, tipTopRight, color)
+            quad(primitives, baseTopLeft, baseBottomLeft, tipBottomLeft, tipTopLeft, color)
+            quad(primitives, baseBottomLeft, baseBottomRight, tipBottomRight, tipBottomLeft, color)
+            quad(primitives, baseBottomRight, baseTopRight, tipTopRight, tipBottomRight, color)
+        }
+
+        private fun quad(primitives: GizmoPrimitives, a: Vec3, b: Vec3, c: Vec3, d: Vec3, color: Int) {
+            primitives.addQuad(a, b, c, d, color)
+            primitives.addQuad(d, c, b, a, color)
+        }
     }
 
     /** Each instance owns a snapshot so it remains safe when rendering uses a different thread. */

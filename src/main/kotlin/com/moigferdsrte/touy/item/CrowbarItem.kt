@@ -2,16 +2,13 @@ package com.moigferdsrte.touy.item
 
 import com.moigferdsrte.touy.SableTouy
 import com.moigferdsrte.touy.core.TouyComponents
-import com.moigferdsrte.touy.util.CrowbarPhysics
 import com.moigferdsrte.touy.util.SubLevelTargeting
-import com.moigferdsrte.touy.util.TouyConfig
 import dev.ryanhcode.sable.Sable
 import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle
 import dev.ryanhcode.sable.index.SableAttributes
 import dev.ryanhcode.sable.sublevel.ServerSubLevel
 import net.minecraft.core.BlockPos
 import net.minecraft.core.component.DataComponents
-import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResult
@@ -56,7 +53,9 @@ class CrowbarItem(properties: Properties, descriptionLines: Int) :
         refreshDefault(other)
         val own = getPunchAttribute(stack) ?: return false
         val incoming = getPunchAttribute(other) ?: return false
+        if (own.amount() >= MAX_STRENGTH) return true
         val strength = (own.amount() + incoming.amount()).coerceIn(0.0, MAX_STRENGTH)
+        if (strength <= own.amount()) return true
         stack.set(DataComponents.ATTRIBUTE_MODIFIERS, createAttributes(strength))
         stack.set(TouyComponents.CUSTOM_CROWBAR, true)
         other.shrink(1)
@@ -72,53 +71,38 @@ class CrowbarItem(properties: Properties, descriptionLines: Int) :
         if (level.isClientSide) return InteractionResult.SUCCESS
         val stack = player.getItemInHand(hand)
         refreshDefault(stack)
-        // Shift-use changes the push multiplier; combining two crowbars adds their strengths.
-        if (player.isShiftKeyDown) {
-            val current = getPunchAttribute(stack)?.amount() ?: TouyConfig.crowbarStrength
-            val strength = if (current >= MAX_STRENGTH) TouyConfig.crowbarStrength else (current * 2).coerceAtMost(MAX_STRENGTH)
-            stack.set(DataComponents.ATTRIBUTE_MODIFIERS, createAttributes(strength))
-            stack.set(TouyComponents.CUSTOM_CROWBAR, true)
-            player.sendOverlayMessage(Component.translatable("touys.message.crowbar_strength", strength.toInt()))
-            return InteractionResult.SUCCESS
-        }
         val hit = SubLevelTargeting.hit(level, player) ?: return InteractionResult.PASS
         val target = Sable.HELPER.getContaining(level, hit.blockPos) as? ServerSubLevel ?: return InteractionResult.PASS
         if (!SubLevelTargeting.canUse(level, player, hit.blockPos) || player.cooldowns.isOnCooldown(stack)) {
             return InteractionResult.FAIL
         }
         val handle = RigidBodyHandle.of(target) ?: return InteractionResult.FAIL
-        val strength = getPunchAttribute(stack)?.amount() ?: TouyConfig.crowbarStrength
+        val strength = (getPunchAttribute(stack)?.amount() ?: DEFAULT_STRENGTH) + 1.0
         val direction = target.logicalPose().transformNormalInverse(
             Vector3d(player.lookAngle.x, player.lookAngle.y, player.lookAngle.z))
-        val position = Vector3d(hit.location.x, hit.location.y, hit.location.z)
-        handle.applyImpulseAtPoint(position, CrowbarPhysics.limitImpulse(target, handle, position,
-            direction.mul(strength + 1.0), CrowbarPhysics.speedLimit(strength)))
+        handle.applyImpulseAtPoint(Vector3d(hit.location.x, hit.location.y, hit.location.z), direction.mul(strength))
         player.cooldowns.addCooldown(stack, 5)
         return InteractionResult.SUCCESS
     }
 
     companion object {
-        const val MAX_STRENGTH = 4096.0
+        const val DEFAULT_STRENGTH = 1.0
+        const val MAX_STRENGTH = 400.0
         private val ATTRIBUTE_ID = SableTouy.id("crowbar")
-        private data class CachedAttributes(val strength: Double, val attributes: ItemAttributeModifiers)
-        @Volatile private var cachedDefaults: CachedAttributes? = null
+        private val defaultAttributeModifiers by lazy { createAttributes(DEFAULT_STRENGTH) }
 
-        /** Builds one attribute component per configuration revision, shared by all default stacks. */
-        private fun defaultAttributes(): ItemAttributeModifiers {
-            val strength = TouyConfig.crowbarStrength.coerceIn(0.0, MAX_STRENGTH)
-            val previous = cachedDefaults
-            if (previous != null && previous.strength == strength) return previous.attributes
-            val attributes = createAttributes(strength)
-            cachedDefaults = CachedAttributes(strength, attributes)
-            return attributes
-        }
+        private fun defaultAttributes(): ItemAttributeModifiers = defaultAttributeModifiers
 
         private fun refreshDefault(stack: ItemStack) {
             val custom = stack.get(TouyComponents.CUSTOM_CROWBAR)
-            if (custom == true) return
+            if (custom == true) {
+                capExistingStrength(stack)
+                return
+            }
             // Legacy or command-created explicit attributes must not be silently replaced.
             if (custom == null && stack.hasNonDefault(DataComponents.ATTRIBUTE_MODIFIERS)) {
                 stack.set(TouyComponents.CUSTOM_CROWBAR, true)
+                capExistingStrength(stack)
                 return
             }
             if (custom == null) stack.set(TouyComponents.CUSTOM_CROWBAR, false)
@@ -126,6 +110,22 @@ class CrowbarItem(properties: Properties, descriptionLines: Int) :
             if (stack.get(DataComponents.ATTRIBUTE_MODIFIERS) != attributes) {
                 stack.set(DataComponents.ATTRIBUTE_MODIFIERS, attributes)
             }
+        }
+
+        private fun capExistingStrength(stack: ItemStack) {
+            if ((getPunchAttribute(stack)?.amount() ?: return) <= MAX_STRENGTH) return
+            val attributes = stack.get(DataComponents.ATTRIBUTE_MODIFIERS) ?: return
+            val builder = ItemAttributeModifiers.builder()
+            for (entry in attributes.modifiers()) {
+                val modifier = entry.modifier()
+                if (entry.matches(SableAttributes.PUNCH_STRENGTH, ATTRIBUTE_ID) && modifier.amount() > MAX_STRENGTH) {
+                    builder.add(entry.attribute(), AttributeModifier(ATTRIBUTE_ID, MAX_STRENGTH, modifier.operation()),
+                        entry.slot(), entry.display())
+                } else {
+                    builder.add(entry.attribute(), modifier, entry.slot(), entry.display())
+                }
+            }
+            stack.set(DataComponents.ATTRIBUTE_MODIFIERS, builder.build())
         }
 
         fun getPunchAttribute(stack: ItemStack): AttributeModifier? {
